@@ -87,6 +87,11 @@ function onUnload() {
     fakeDeaf = false;
 }
 
+module.exports = { onLoad: onLoad, onUnload: onUnload };
+    fakeMute = false;
+    fakeDeaf = false;
+}
+
 module.exports = { onLoad: onLoad, onUnload: onUnload };        });
 
         vendetta.ui.toasts.showToast("FDML: commands registered, searching module...");
