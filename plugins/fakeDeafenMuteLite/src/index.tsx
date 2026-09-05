@@ -1,20 +1,34 @@
-import { findByProps } from "@vendetta/metro";
-import { instead } from "@vendetta/patcher";
 import { registerCommand } from "@vendetta/commands";
 import { showToast } from "@vendetta/ui/toasts";
 
 let fakeMute = false;
 let fakeDeaf = false;
-let unpatchMute: (() => void) | undefined;
-let unpatchDeaf: (() => void) | undefined;
+let origSend: typeof WebSocket.prototype.send;
 let unregisterMuteCmd: (() => void) | undefined;
 let unregisterDeafCmd: (() => void) | undefined;
 
-function log(text: string) {
-    console.log(`[FakeDeafenMuteLite] ${text}`);
-}
-
 export const onLoad = () => {
+    origSend = WebSocket.prototype.send;
+
+    WebSocket.prototype.send = function (data: any) {
+        try {
+            if (typeof data === "string" && data.includes('"op":4')) {
+                const obj = JSON.parse(data);
+                if (obj.d) {
+                    if (fakeDeaf && obj.d.self_deaf === false) {
+                        return;
+                    }
+                    if (fakeMute && obj.d.self_mute === false) {
+                        return;
+                    }
+                }
+            }
+        } catch (e) {
+            // not JSON or not relevant, fall through
+        }
+        return origSend.apply(this, arguments as any);
+    };
+
     unregisterMuteCmd = registerCommand({
         name: "fakemute",
         displayName: "fakemute",
@@ -44,38 +58,12 @@ export const onLoad = () => {
             showToast(`Fake Deafen ${fakeDeaf ? "enabled" : "disabled"}`);
         }
     });
-
-    const MediaEngineActions = findByProps("setSelfMute", "setSelfDeaf");
-
-    if (!MediaEngineActions) {
-        showToast("FakeDeafenMuteLite: couldn't find the media engine module - Discord may have changed internally.");
-        log("MediaEngineActions module not found, aborting");
-        return;
-    }
-
-    unpatchMute = instead("setSelfMute", MediaEngineActions, (args, orig) => {
-        if (fakeMute) {
-            return orig.apply(MediaEngineActions, [false, ...args.slice(1)]);
-        }
-        return orig.apply(MediaEngineActions, args);
-    });
-
-    unpatchDeaf = instead("setSelfDeaf", MediaEngineActions, (args, orig) => {
-        if (fakeDeaf) {
-            return orig.apply(MediaEngineActions, [false, ...args.slice(1)]);
-        }
-        return orig.apply(MediaEngineActions, args);
-    });
-
-    log("Ready");
 };
 
 export const onUnload = () => {
-    unpatchMute?.();
-    unpatchDeaf?.();
+    if (origSend) WebSocket.prototype.send = origSend;
     unregisterMuteCmd?.();
     unregisterDeafCmd?.();
     fakeMute = false;
     fakeDeaf = false;
-    log("Disarmed");
 }; 
