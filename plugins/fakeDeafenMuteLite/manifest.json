@@ -1,1 +1,14 @@
-
+{
+    "name": "FakeDeafenMuteLite",
+    "description": "Fake mute/deafen using function patching instead of raw WebSocket interception. The state everyone else sees is always the real, correct one - only your own local mic/speaker behavior is overridden so you keep hearing and talking.",
+    "authors": [
+        {
+            "name": "You",
+            "id": "0"
+        }
+    ],
+    "main": "src/index.tsx",
+    "vendetta": {
+        "icon": "ic_mute"
+    }
+}
