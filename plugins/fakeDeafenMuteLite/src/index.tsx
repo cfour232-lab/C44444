@@ -3,6 +3,7 @@ import { showToast } from "@vendetta/ui/toasts";
 
 let fakeMute = false;
 let fakeDeaf = false;
+let lastChannelId: string | null | undefined = undefined;
 let origSend: typeof WebSocket.prototype.send;
 let unregisterMuteCmd: (() => void) | undefined;
 let unregisterDeafCmd: (() => void) | undefined;
@@ -15,11 +16,16 @@ export const onLoad = () => {
             if (typeof data === "string" && data.includes('"op":4')) {
                 const obj = JSON.parse(data);
                 if (obj.d) {
-                    if (fakeDeaf && obj.d.self_deaf === false) {
-                        return;
-                    }
-                    if (fakeMute && obj.d.self_mute === false) {
-                        return;
+                    const switchingChannel = obj.d.channel_id !== lastChannelId;
+                    lastChannelId = obj.d.channel_id;
+
+                    if (!switchingChannel) {
+                        if (fakeDeaf && obj.d.self_deaf === false) {
+                            return;
+                        }
+                        if (fakeMute && obj.d.self_mute === false) {
+                            return;
+                        }
                     }
                 }
             }
@@ -66,4 +72,5 @@ export const onUnload = () => {
     unregisterDeafCmd?.();
     fakeMute = false;
     fakeDeaf = false;
+    lastChannelId = undefined;
 }; 
