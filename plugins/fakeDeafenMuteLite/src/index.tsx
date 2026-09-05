@@ -3,57 +3,79 @@ let fakeDeaf = false;
 let unpatchMute, unpatchDeaf, unregisterMuteCmd, unregisterDeafCmd;
 
 function onLoad() {
-    fakeMute = vendetta.storage.fakeMute || false;
-    fakeDeaf = vendetta.storage.fakeDeaf || false;
+    var api = (typeof bunny !== "undefined") ? bunny
+             : (typeof vendetta !== "undefined") ? vendetta
+             : null;
 
-    unregisterMuteCmd = vendetta.commands.registerCommand({
-        name: "fakemute",
-        displayName: "fakemute",
-        description: "Toggle fake mute",
-        displayDescription: "Toggle fake mute",
-        applicationId: "-1",
-        type: 1,
-        inputType: 1,
-        options: [],
-        execute: function () {
-            fakeMute = !fakeMute;
-            vendetta.storage.fakeMute = fakeMute;
-            vendetta.ui.toasts.showToast("Fake Mute " + (fakeMute ? "enabled" : "disabled"));
-        }
-    });
-
-    unregisterDeafCmd = vendetta.commands.registerCommand({
-        name: "fakedeafen",
-        displayName: "fakedeafen",
-        description: "Toggle fake deafen",
-        displayDescription: "Toggle fake deafen",
-        applicationId: "-1",
-        type: 1,
-        inputType: 1,
-        options: [],
-        execute: function () {
-            fakeDeaf = !fakeDeaf;
-            vendetta.storage.fakeDeaf = fakeDeaf;
-            vendetta.ui.toasts.showToast("Fake Deafen " + (fakeDeaf ? "enabled" : "disabled"));
-        }
-    });
-
-    var MediaEngineActions = vendetta.metro.findByProps("setSelfMute", "setSelfDeaf");
-
-    if (!MediaEngineActions) {
-        vendetta.ui.toasts.showToast("FakeDeafenMuteLite: media engine module not found");
+    if (!api) {
+        try {
+            console.log("FDML: no API global found (neither bunny nor vendetta)");
+        } catch (e) {}
         return;
     }
 
-    unpatchMute = vendetta.patcher.instead("setSelfMute", MediaEngineActions, function (args, orig) {
-        if (fakeMute) return orig.apply(MediaEngineActions, [false].concat(args.slice(1)));
-        return orig.apply(MediaEngineActions, args);
-    });
+    try {
+        api.ui.toasts.showToast("FDML: found API as " + (typeof bunny !== "undefined" ? "bunny" : "vendetta"));
 
-    unpatchDeaf = vendetta.patcher.instead("setSelfDeaf", MediaEngineActions, function (args, orig) {
-        if (fakeDeaf) return orig.apply(MediaEngineActions, [false].concat(args.slice(1)));
-        return orig.apply(MediaEngineActions, args);
-    });
+        unregisterMuteCmd = api.commands.registerCommand({
+            name: "fakemute",
+            displayName: "fakemute",
+            description: "Toggle fake mute",
+            displayDescription: "Toggle fake mute",
+            applicationId: "-1",
+            type: 1,
+            inputType: 1,
+            options: [],
+            execute: function () {
+                fakeMute = !fakeMute;
+                api.ui.toasts.showToast("Fake Mute " + (fakeMute ? "enabled" : "disabled"));
+            }
+        });
+
+        unregisterDeafCmd = api.commands.registerCommand({
+            name: "fakedeafen",
+            displayName: "fakedeafen",
+            description: "Toggle fake deafen",
+            displayDescription: "Toggle fake deafen",
+            applicationId: "-1",
+            type: 1,
+            inputType: 1,
+            options: [],
+            execute: function () {
+                fakeDeaf = !fakeDeaf;
+                api.ui.toasts.showToast("Fake Deafen " + (fakeDeaf ? "enabled" : "disabled"));
+            }
+        });
+
+        api.ui.toasts.showToast("FDML: commands registered, searching module...");
+
+        var MediaEngineActions = api.metro.findByProps("setSelfMute", "setSelfDeaf");
+
+        if (!MediaEngineActions) {
+            api.ui.toasts.showToast("FDML: setSelfMute/setSelfDeaf module NOT FOUND");
+            return;
+        }
+
+        api.ui.toasts.showToast("FDML: module found, patching...");
+
+        unpatchMute = api.patcher.instead("setSelfMute", MediaEngineActions, function (args, orig) {
+            if (fakeMute) return orig.apply(MediaEngineActions, [false].concat(args.slice(1)));
+            return orig.apply(MediaEngineActions, args);
+        });
+
+        unpatchDeaf = api.patcher.instead("setSelfDeaf", MediaEngineActions, function (args, orig) {
+            if (fakeDeaf) return orig.apply(MediaEngineActions, [false].concat(args.slice(1)));
+            return orig.apply(MediaEngineActions, args);
+        });
+
+        api.ui.toasts.showToast("FDML: patch applied successfully");
+    } catch (e) {
+        try {
+            api.ui.toasts.showToast("FDML ERROR: " + (e && e.message ? e.message : String(e)));
+        } catch (e2) {
+            console.log("FDML ERROR (no toast): " + (e && e.message ? e.message : String(e)));
+        }
+    }
 }
 
 function onUnload() {
@@ -61,39 +83,8 @@ function onUnload() {
     if (unpatchDeaf) unpatchDeaf();
     if (unregisterMuteCmd) unregisterMuteCmd();
     if (unregisterDeafCmd) unregisterDeafCmd();
+    fakeMute = false;
+    fakeDeaf = false;
 }
 
-function Settings() {
-    var React = vendetta.metro.common.React;
-    var Forms = vendetta.ui.components.Forms;
-
-    var muteState = React.useState(fakeMute);
-    var deafState = React.useState(fakeDeaf);
-
-    return React.createElement(
-        Forms.FormSection,
-        null,
-        React.createElement(Forms.FormSwitchRow, {
-            label: "Fake Mute",
-            subLabel: "Others see you muted, your mic keeps working",
-            value: muteState[0],
-            onValueChange: function (v) {
-                fakeMute = v;
-                vendetta.storage.fakeMute = v;
-                muteState[1](v);
-            }
-        }),
-        React.createElement(Forms.FormSwitchRow, {
-            label: "Fake Deafen",
-            subLabel: "Others see you deafened, you keep hearing",
-            value: deafState[0],
-            onValueChange: function (v) {
-                fakeDeaf = v;
-                vendetta.storage.fakeDeaf = v;
-                deafState[1](v);
-            }
-        })
-    );
-}
-
-module.exports = { onLoad: onLoad, onUnload: onUnload, settings: Settings }; 
+module.exports = { onLoad: onLoad, onUnload: onUnload }; 
