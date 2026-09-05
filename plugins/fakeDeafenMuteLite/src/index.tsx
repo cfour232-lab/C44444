@@ -3,10 +3,21 @@ let fakeDeaf = false;
 let unpatchMute, unpatchDeaf, unregisterMuteCmd, unregisterDeafCmd;
 
 function onLoad() {
-    try {
-        vendetta.ui.toasts.showToast("FDML: onLoad started");
+    var api = (typeof bunny !== "undefined") ? bunny
+             : (typeof vendetta !== "undefined") ? vendetta
+             : null;
 
-        unregisterMuteCmd = vendetta.commands.registerCommand({
+    if (!api) {
+        try {
+            console.log("FDML: no API global found (neither bunny nor vendetta)");
+        } catch (e) {}
+        return;
+    }
+
+    try {
+        api.ui.toasts.showToast("FDML: found API as " + (typeof bunny !== "undefined" ? "bunny" : "vendetta"));
+
+        unregisterMuteCmd = api.commands.registerCommand({
             name: "fakemute",
             displayName: "fakemute",
             description: "Toggle fake mute",
@@ -17,11 +28,11 @@ function onLoad() {
             options: [],
             execute: function () {
                 fakeMute = !fakeMute;
-                vendetta.ui.toasts.showToast("Fake Mute " + (fakeMute ? "enabled" : "disabled"));
+                api.ui.toasts.showToast("Fake Mute " + (fakeMute ? "enabled" : "disabled"));
             }
         });
 
-        unregisterDeafCmd = vendetta.commands.registerCommand({
+        unregisterDeafCmd = api.commands.registerCommand({
             name: "fakedeafen",
             displayName: "fakedeafen",
             description: "Toggle fake deafen",
@@ -32,9 +43,51 @@ function onLoad() {
             options: [],
             execute: function () {
                 fakeDeaf = !fakeDeaf;
-                vendetta.ui.toasts.showToast("Fake Deafen " + (fakeDeaf ? "enabled" : "disabled"));
+                api.ui.toasts.showToast("Fake Deafen " + (fakeDeaf ? "enabled" : "disabled"));
             }
         });
+
+        api.ui.toasts.showToast("FDML: commands registered, searching module...");
+
+        var MediaEngineActions = api.metro.findByProps("setSelfMute", "setSelfDeaf");
+
+        if (!MediaEngineActions) {
+            api.ui.toasts.showToast("FDML: setSelfMute/setSelfDeaf module NOT FOUND");
+            return;
+        }
+
+        api.ui.toasts.showToast("FDML: module found, patching...");
+
+        unpatchMute = api.patcher.instead("setSelfMute", MediaEngineActions, function (args, orig) {
+            if (fakeMute) return orig.apply(MediaEngineActions, [false].concat(args.slice(1)));
+            return orig.apply(MediaEngineActions, args);
+        });
+
+        unpatchDeaf = api.patcher.instead("setSelfDeaf", MediaEngineActions, function (args, orig) {
+            if (fakeDeaf) return orig.apply(MediaEngineActions, [false].concat(args.slice(1)));
+            return orig.apply(MediaEngineActions, args);
+        });
+
+        api.ui.toasts.showToast("FDML: patch applied successfully");
+    } catch (e) {
+        try {
+            api.ui.toasts.showToast("FDML ERROR: " + (e && e.message ? e.message : String(e)));
+        } catch (e2) {
+            console.log("FDML ERROR (no toast): " + (e && e.message ? e.message : String(e)));
+        }
+    }
+}
+
+function onUnload() {
+    if (unpatchMute) unpatchMute();
+    if (unpatchDeaf) unpatchDeaf();
+    if (unregisterMuteCmd) unregisterMuteCmd();
+    if (unregisterDeafCmd) unregisterDeafCmd();
+    fakeMute = false;
+    fakeDeaf = false;
+}
+
+module.exports = { onLoad: onLoad, onUnload: onUnload };        });
 
         vendetta.ui.toasts.showToast("FDML: commands registered, searching module...");
 
