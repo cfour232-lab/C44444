@@ -3,19 +3,19 @@ let fakeDeaf = false;
 let unpatchMute, unpatchDeaf, unregisterMuteCmd, unregisterDeafCmd;
 
 function onLoad() {
-    var api = (typeof bunny !== "undefined") ? bunny
-             : (typeof vendetta !== "undefined") ? vendetta
-             : null;
+    var api: any =
+        (typeof (globalThis as any).kettu !== "undefined") ? (globalThis as any).kettu
+      : (typeof (globalThis as any).bunny !== "undefined") ? (globalThis as any).bunny
+      : (typeof (globalThis as any).vendetta !== "undefined") ? (globalThis as any).vendetta
+      : null;
 
     if (!api) {
-        try {
-            console.log("FDML: no API global found (neither bunny nor vendetta)");
-        } catch (e) {}
+        try { console.log("FDML: no API global found (kettu/bunny/vendetta)"); } catch (e) {}
         return;
     }
 
     try {
-        api.ui.toasts.showToast("FDML: found API as " + (typeof bunny !== "undefined" ? "bunny" : "vendetta"));
+        api.ui.toasts.showToast("FDML: onLoad started");
 
         unregisterMuteCmd = api.commands.registerCommand({
             name: "fakemute",
@@ -88,3 +88,4 @@ function onUnload() {
 }
 
 module.exports = { onLoad: onLoad, onUnload: onUnload };
+ 
