@@ -1,71 +1,81 @@
+import { findByProps } from "@vendetta/metro";
+import { instead } from "@vendetta/patcher";
+import { registerCommand } from "@vendetta/commands";
+import { showToast } from "@vendetta/ui/toasts";
+
 let fakeMute = false;
 let fakeDeaf = false;
-let unpatchMute, unpatchDeaf, unregisterMuteCmd, unregisterDeafCmd;
+let unpatchMute: (() => void) | undefined;
+let unpatchDeaf: (() => void) | undefined;
+let unregisterMuteCmd: (() => void) | undefined;
+let unregisterDeafCmd: (() => void) | undefined;
 
-function onLoad() {
-    vendetta.ui.toasts.showToast("FDML: onLoad started");
+function log(text: string) {
+    console.log(`[FakeDeafenMuteLite] ${text}`);
+}
 
-    unregisterMuteCmd = vendetta.commands.registerCommand({
+export const onLoad = () => {
+    unregisterMuteCmd = registerCommand({
         name: "fakemute",
         displayName: "fakemute",
-        description: "Toggle fake mute",
-        displayDescription: "Toggle fake mute",
+        description: "Toggle fake mute: your mic keeps working while others see you as muted",
+        displayDescription: "Toggle fake mute: your mic keeps working while others see you as muted",
         applicationId: "-1",
         type: 1,
         inputType: 1,
         options: [],
-        execute: function () {
+        execute: () => {
             fakeMute = !fakeMute;
-            vendetta.ui.toasts.showToast("Fake Mute " + (fakeMute ? "enabled" : "disabled"));
+            showToast(`Fake Mute ${fakeMute ? "enabled" : "disabled"}`);
         }
     });
 
-    unregisterDeafCmd = vendetta.commands.registerCommand({
+    unregisterDeafCmd = registerCommand({
         name: "fakedeafen",
         displayName: "fakedeafen",
-        description: "Toggle fake deafen",
-        displayDescription: "Toggle fake deafen",
+        description: "Toggle fake deafen: you keep hearing while others see you as deafened",
+        displayDescription: "Toggle fake deafen: you keep hearing while others see you as deafened",
         applicationId: "-1",
         type: 1,
         inputType: 1,
         options: [],
-        execute: function () {
+        execute: () => {
             fakeDeaf = !fakeDeaf;
-            vendetta.ui.toasts.showToast("Fake Deafen " + (fakeDeaf ? "enabled" : "disabled"));
+            showToast(`Fake Deafen ${fakeDeaf ? "enabled" : "disabled"}`);
         }
     });
 
-    vendetta.ui.toasts.showToast("FDML: commands registered, searching module...");
-
-    var MediaEngineActions = vendetta.metro.findByProps("setSelfMute", "setSelfDeaf");
+    const MediaEngineActions = findByProps("setSelfMute", "setSelfDeaf");
 
     if (!MediaEngineActions) {
-        vendetta.ui.toasts.showToast("FDML: setSelfMute/setSelfDeaf module NOT FOUND");
+        showToast("FakeDeafenMuteLite: couldn't find the media engine module - Discord may have changed internally.");
+        log("MediaEngineActions module not found, aborting");
         return;
     }
 
-    vendetta.ui.toasts.showToast("FDML: module found, patching...");
-
-    unpatchMute = vendetta.patcher.instead("setSelfMute", MediaEngineActions, function (args, orig) {
-        if (fakeMute) return orig.apply(MediaEngineActions, [false].concat(args.slice(1)));
+    unpatchMute = instead("setSelfMute", MediaEngineActions, (args, orig) => {
+        if (fakeMute) {
+            return orig.apply(MediaEngineActions, [false, ...args.slice(1)]);
+        }
         return orig.apply(MediaEngineActions, args);
     });
 
-    unpatchDeaf = vendetta.patcher.instead("setSelfDeaf", MediaEngineActions, function (args, orig) {
-        if (fakeDeaf) return orig.apply(MediaEngineActions, [false].concat(args.slice(1)));
+    unpatchDeaf = instead("setSelfDeaf", MediaEngineActions, (args, orig) => {
+        if (fakeDeaf) {
+            return orig.apply(MediaEngineActions, [false, ...args.slice(1)]);
+        }
         return orig.apply(MediaEngineActions, args);
     });
 
-    vendetta.ui.toasts.showToast("FDML: patch applied successfully");
-}
+    log("Ready");
+};
 
-function onUnload() {
-    if (unpatchMute) unpatchMute();
-    if (unpatchDeaf) unpatchDeaf();
-    if (unregisterMuteCmd) unregisterMuteCmd();
-    if (unregisterDeafCmd) unregisterDeafCmd();
+export const onUnload = () => {
+    unpatchMute?.();
+    unpatchDeaf?.();
+    unregisterMuteCmd?.();
+    unregisterDeafCmd?.();
     fakeMute = false;
     fakeDeaf = false;
-}
-
-module.exports = { onLoad: onLoad, onUnload: onUnload }; 
+    log("Disarmed");
+}; 
