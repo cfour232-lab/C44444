@@ -1,5 +1,4 @@
 import { registerCommand } from "@vendetta/commands";
-import { showToast } from "@vendetta/ui/toasts";
 
 let fakeMute = false;
 let fakeDeaf = false;
@@ -20,12 +19,8 @@ export const onLoad = () => {
                     lastChannelId = obj.d.channel_id;
 
                     if (!switchingChannel) {
-                        if (fakeDeaf && obj.d.self_deaf === false) {
-                            return;
-                        }
-                        if (fakeMute && obj.d.self_mute === false) {
-                            return;
-                        }
+                        if (fakeDeaf && obj.d.self_deaf === false) return;
+                        if (fakeMute && obj.d.self_mute === false) return;
                     }
                 }
             }
@@ -46,7 +41,6 @@ export const onLoad = () => {
         options: [],
         execute: () => {
             fakeMute = !fakeMute;
-            showToast(`Fake Mute ${fakeMute ? "enabled" : "disabled"}`);
         }
     });
 
@@ -61,7 +55,6 @@ export const onLoad = () => {
         options: [],
         execute: () => {
             fakeDeaf = !fakeDeaf;
-            showToast(`Fake Deafen ${fakeDeaf ? "enabled" : "disabled"}`);
         }
     });
 };
@@ -73,4 +66,4 @@ export const onUnload = () => {
     fakeMute = false;
     fakeDeaf = false;
     lastChannelId = undefined;
-}; 
+};
